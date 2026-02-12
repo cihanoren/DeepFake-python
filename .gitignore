@@ -1,6 +1,13 @@
+# Environment
 .env
+
+# macOS
 .DS_Store
+
+# Python
 __pycache__/
 *.pyc
 venv/
+
+# Generated / local files
 analysis_result.html
