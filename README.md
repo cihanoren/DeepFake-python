@@ -23,6 +23,7 @@ DeepFake-python/
 │   └── model_simulator.py          # CNN simülasyonu + Grad-CAM
 │
 ├── benchmark.py         # Performans testi
+├── benchmark_viewer.py  # Çıktı analizli performans testi
 ├── requirements.txt
 ├── .env.example         # Ortam değişkenleri şablonu
 └── README.md

@@ -4,26 +4,39 @@ from datetime import datetime
 from uuid import UUID
 
 
-# ── İstek Modelleri ───────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# İSTEK MODELİ
+# ══════════════════════════════════════════════════════════════════
 
 class AnalyzeUrlRequest(BaseModel):
     """
-    Tüm analiz route'larının ortak istek modeli.
-    `id` .NET tarafından üretilip gönderilir; Python tarafı asla UUID üretmez.
+    .NET API'den gelen analiz isteği.
+
+    İş Akışı:
+      1. Kullanıcı görseli .NET'e yükler
+      2. .NET görseli diske kaydeder, DB'de 'Processing' kaydı açar
+      3. Bu istek Python'a iletilir
+      4. Python analiz yapar → base64 görseller + skorlar döner
+      5. .NET base64'leri diske yazar, *Path alanlarını günceller
+      6. .NET thumbnail oluşturur (150x150), ThumbnailPath yazar
+      7. DB Status → 'Completed'
     """
-    id:        UUID = Field(..., description=".NET tarafından üretilen kayıt UUID'si")
-    image_url: str  = Field(..., description="Analiz edilecek görüntünün URL'si")
+    id:                  UUID = Field(..., description=".NET'in ürettiği kayıt UUID'si")
+    image_url:           str  = Field(..., description="Görselin erişilebilir URL'si")
 
     class Config:
         json_schema_extra = {
             "example": {
-                "id":        "550e8400-e29b-41d4-a716-446655440000",
-                "image_url": "https://example.com/photo.jpg",
+                "id":                  "550e8400-e29b-41d4-a716-446655440000",
+                "image_url":           "https://api.example.com/uploads/img123.jpg",
+                
             }
         }
 
 
-# ── Alt Sonuç Modelleri ───────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# ALT SONUÇ MODELLERİ (tekil route'lar)
+# ══════════════════════════════════════════════════════════════════
 
 class ElaMetrics(BaseModel):
     homogeneity:       float
@@ -65,21 +78,46 @@ class ModelResult(BaseModel):
     gradcam_b64: str
 
 
-# ── Ana Yanıt Modeli (DB tablosuna uyumlu) ────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# ANA YANIT MODELİ  ←→  DB: AnalysisResults tablosu
+# ══════════════════════════════════════════════════════════════════
 
 class AnalysisResult(BaseModel):
     """
-    .NET AnalysisResults tablosuna birebir uyumlu model.
-    Id her zaman .NET'ten gelir, Python üretmez.
-    Görseller base64 JPEG olarak taşınır, diske yazılmaz.
+    Python servisi → .NET API yanıtı.
+
+    DB Sütun Eşleşmesi:
+    ┌─────────────────────────────┬──────────────────────────────────────┐
+    │ Python Alanı                │ DB Sütunu / Açıklama                 │
+    ├─────────────────────────────┼──────────────────────────────────────┤
+    │ Id                          │ Id  (.NET'ten gelir, aynen döner)    │
+    │ IsDeepfake                  │ IsDeepfake                           │
+    │ CnnConfidence               │ CnnConfidence                        │
+    │ ElaScore                    │ ElaScore                             │
+    │ FftAnomalyScore             │ FftAnomalyScore                      │
+    │ ExifHasMetadata             │ ExifHasMetadata                      │
+    │ ExifCameraInfo              │ ExifCameraInfo                       │
+    │ ExifSuspiciousIndicators    │ ExifSuspiciousIndicators             │
+    │ GradcamImageBase64          │ → .NET diske yazar → GradcamImagePath│
+    │ ElaImageBase64              │ → .NET diske yazar → ElaImagePath    │
+    │ FftImageBase64              │ → .NET diske yazar → FftImagePath    │
+    │ (yok)                       │ OriginalImagePath  (.NET biliyor)    │
+    │ (yok)                       │ ThumbnailPath      (.NET oluşturur)  │
+    │ ProcessingTimeSeconds       │ ProcessingTimeSeconds                │
+    │ Status                      │ Status                               │
+    │ ErrorMessage                │ ErrorMessage                         │
+    │ CreatedAt / UpdatedAt       │ CreatedAt / UpdatedAt                │
+    └─────────────────────────────┴──────────────────────────────────────┘
     """
-    Id: UUID  # .NET'ten gelen, değişmez
+
+    # Kimlik
+    Id: UUID
 
     # CNN
     IsDeepfake:    bool
     CnnConfidence: float = Field(..., ge=0.0, le=1.0)
 
-    # Analiz skorları
+    # Analiz Skorları
     ElaScore:        Optional[float] = Field(None, ge=0.0, le=1.0)
     FftAnomalyScore: Optional[float] = Field(None, ge=0.0, le=1.0)
 
@@ -88,17 +126,19 @@ class AnalysisResult(BaseModel):
     ExifCameraInfo:           Optional[str] = None
     ExifSuspiciousIndicators: Optional[str] = None  # ';' ile ayrılmış
 
-    # Görseller (base64 JPEG)
-    GradcamImage:   Optional[str] = None
-    ElaImage:       Optional[str] = None
-    FftImage:       Optional[str] = None
-    ThumbnailImage: Optional[str] = None
+    # Analiz Görselleri — base64 JPEG
+    # .NET bunları diske yazıp DB'deki *Path sütunlarını günceller.
+    # OriginalImagePath ve ThumbnailPath .NET tarafında yönetilir.
+    GradcamImageBase64: Optional[str] = None
+    ElaImageBase64:     Optional[str] = None
+    FftImageBase64:     Optional[str] = None
 
-    # İşlem bilgisi
+    # İşlem Bilgisi
     ProcessingTimeSeconds: Optional[float] = None
-    Status:       str           = "Completed"
+    Status:       str           = "Completed"  # Processing | Completed | Failed
     ErrorMessage: Optional[str] = None
 
+    # Zaman Damgaları
     CreatedAt: datetime = Field(default_factory=datetime.utcnow)
     UpdatedAt: datetime = Field(default_factory=datetime.utcnow)
 
@@ -112,18 +152,21 @@ class AnalysisResult(BaseModel):
                 "FftAnomalyScore":          0.7123,
                 "ExifHasMetadata":          False,
                 "ExifCameraInfo":           None,
-                "ExifSuspiciousIndicators": "EXIF verisi yok;Küçük dosya boyutu",
-                "GradcamImage":             "<base64>",
-                "ElaImage":                 "<base64>",
-                "FftImage":                 "<base64>",
-                "ThumbnailImage":           "<base64>",
+                "ExifSuspiciousIndicators": "EXIF verisi yok;Kamera bilgisi eksik",
+                "GradcamImageBase64":       "<base64 JPEG — .NET GradcamImagePath'e yazar>",
+                "ElaImageBase64":           "<base64 JPEG — .NET ElaImagePath'e yazar>",
+                "FftImageBase64":           "<base64 JPEG — .NET FftImagePath'e yazar>",
                 "ProcessingTimeSeconds":    3.45,
                 "Status":                   "Completed",
+                "ErrorMessage":             None,
             }
         }
 
 
-# ── Hata Yanıt Modeli ─────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════
+# HATA YANIT MODELİ
+# DB: Status='Failed', ErrorMessage doldurulur
+# ══════════════════════════════════════════════════════════════════
 
 class ErrorResponse(BaseModel):
     Id:           UUID
