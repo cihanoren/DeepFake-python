@@ -244,3 +244,70 @@ python3 benchmark.py --url https://example.com/photo.jpg --n 10 --key my-secret-
 | ELA      | JPEG manipülasyon tespiti       |
 | FFT      | Frekans alanı anomali tespiti   |
 | Metadata | EXIF / dosya bilgisi analizi    |
+
+
+
+
+🐳 Docker ile Çalıştırma
+
+📦 1️⃣ Dockerfile ve .dockerignore
+
+Proje kök dizininde şu dosyalar olmalıdır:
+
+DeepFake-python/
+├── Dockerfile
+├── .dockerignore
+
+
+⸻
+
+🏗 2️⃣ Image Build
+
+Proje klasöründe:
+
+docker build -t deepfake-api .
+
+
+⸻
+
+▶️ 3️⃣ Container Çalıştırma
+
+docker run --env-file .env -p 8000:8000 deepfake-api
+
+API:
+
+http://localhost:8000
+
+Swagger:
+
+http://localhost:8000/docs
+
+
+⸻
+
+🔐 Environment Variable ile Çalıştırma (Production)
+
+docker run \
+  -e DEEPFAKE_API_KEY_DISABLED=false \
+  -e DEEPFAKE_API_KEY=super-secret-key \
+  -p 8000:8000 \
+  deepfake-api
+
+
+⸻
+
+🛑 Container Durdurma
+
+docker ps
+docker stop <container_id>
+
+
+⸻
+
+📦 Notlar
+	•	Disk yazımı yok → servis stateless çalışır
+	•	Volume gerekmez
+	•	Production ortamında .env dosyası image içine eklenmez
+	•	Python 3.11 slim base image kullanılır
+
+
