@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  deepfake-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: deepfake-api:latest
+    container_name: deepfake-api
+    
+    # Port mapping
+    ports:
+      - "8000:8000"
+    
+    # Environment variables (override with .env)
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DEEPFAKE_API_KEY_DISABLED=${DEEPFAKE_API_KEY_DISABLED:-false}
+      - DEEPFAKE_API_KEY=${DEEPFAKE_API_KEY:-change-me}
+    
+    # Load from .env file if exists
+    env_file:
+      - .env
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Health check (uses built-in Docker healthcheck)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    
+    # Resource limits (adjust based on your server)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    read_only: false  # FastAPI needs write access for temp files
+    tmpfs:
+      - /tmp
+    
+    # Network (optional: isolate from other containers)
+    # networks:
+    #   - deepfake-network
+
+# Optional: Custom network
+# networks:
+#   deepfake-network:
+#     driver: bridge

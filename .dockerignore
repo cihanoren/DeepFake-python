@@ -1,19 +1,77 @@
-# Git
-.git
-.gitignore
+# ══════════════════════════════════════════════════════════════════
+# .dockerignore - Docker build için hariç tutulanlar
+# ══════════════════════════════════════════════════════════════════
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
+env/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
 
-# Env
-.env
-
-# Local files
-uploads/
-outputs/
-analysis_result.html
-
-# macOS
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+tests/
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# Outputs (test/benchmark sonuçları)
+outputs/
+uploads/
+analysis_result.html
+*.log
+
+# Benchmark scripts (production'da gereksiz)
+benchmark.py
+benchmark_viewer.py
+
+# Database
+*.db
+*.sqlite
+*.sql
+
+# Misc
+node_modules/
+.pytest_cache/
+COMMIT_MESSAGE.txt

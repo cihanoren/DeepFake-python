@@ -6,4 +6,4 @@ numpy==1.26.3
 opencv-python==4.9.0.80
 pydantic==2.5.3
 python-dotenv==1.0.0
-requests
+requests==2.31.0
