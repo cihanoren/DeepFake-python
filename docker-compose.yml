@@ -1,39 +1,65 @@
-version: '3.8'
+# ══════════════════════════════════════════════════════════════════
+# DeepFake Detection – Async Event-Driven Mimari
+# Servisler:
+#   1. rabbitmq       → mesaj kuyruğu + yönetim UI
+#   2. python-worker  → analysis_queue tüketir, analiz yapar
+#   3. dotnet-api     → (yorum satırı, hazır olunca açın)
+#
+# Başlatma:
+#   docker-compose up -d --build
+#   docker-compose logs -f python-worker
+# ══════════════════════════════════════════════════════════════════
 
 services:
-  deepfake-api:
+
+  # ── 1. RabbitMQ ───────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: deepfake-rabbitmq
+    hostname: rabbitmq          # Durable queue için sabit hostname şart
+    ports:
+      - "5672:5672"             # AMQP
+      - "15672:15672"           # Yönetim UI → http://localhost:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-admin123}
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - deepfake-net
+
+  # ── 2. Python Worker ──────────────────────────────────────────
+  python-worker:
     build:
       context: .
       dockerfile: Dockerfile
-    image: deepfake-api:latest
-    container_name: deepfake-api
-    
-    # Port mapping
-    ports:
-      - "8000:8000"
-    
-    # Environment variables (override with .env)
+    image: deepfake-worker:latest
+    container_name: deepfake-python-worker
     environment:
       - PYTHONUNBUFFERED=1
-      - DEEPFAKE_API_KEY_DISABLED=${DEEPFAKE_API_KEY_DISABLED:-false}
+      - MODE=worker
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQ_USER:-admin}
+      - RABBITMQ_PASS=${RABBITMQ_PASS:-admin123}
+      - WORKER_THREADS=${WORKER_THREADS:-4}
+      # Hassas bilgiler .env dosyasından gelir, buraya yazmayın
       - DEEPFAKE_API_KEY=${DEEPFAKE_API_KEY:-change-me}
-    
-    # Load from .env file if exists
+      - DEEPFAKE_API_KEY_DISABLED=${DEEPFAKE_API_KEY_DISABLED:-false}
     env_file:
-      - .env
-    
-    # Restart policy
-    restart: unless-stopped
-    
-    # Health check (uses built-in Docker healthcheck)
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-    
-    # Resource limits (adjust based on your server)
+      - path: .env
+        required: false           # .env yoksa hata verme, env var'ları kullan
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -42,26 +68,43 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-    
-    # Logging
+    restart: unless-stopped
+    networks:
+      - deepfake-net
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    
-    # Security
-    security_opt:
-      - no-new-privileges:true
-    read_only: false  # FastAPI needs write access for temp files
-    tmpfs:
-      - /tmp
-    
-    # Network (optional: isolate from other containers)
-    # networks:
-    #   - deepfake-network
 
-# Optional: Custom network
-# networks:
-#   deepfake-network:
-#     driver: bridge
+  # ── 3. .NET API (hazır olunca aşağıdaki yorumu kaldırın) ──────
+  # dotnet-api:
+  #   build:
+  #     context: ./DeepFakeApi
+  #     dockerfile: Dockerfile
+  #   image: deepfake-dotnet-api:latest
+  #   container_name: deepfake-dotnet-api
+  #   ports:
+  #     - "5000:80"
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #     - ASPNETCORE_URLS=http://+:80
+  #     - RabbitMQ__Host=rabbitmq
+  #     - RabbitMQ__Port=5672
+  #     - RabbitMQ__Username=${RABBITMQ_USER:-admin}
+  #     - RabbitMQ__Password=${RABBITMQ_PASS:-admin123}
+  #     - ConnectionStrings__DefaultConnection=${DB_CONNECTION}
+  #   depends_on:
+  #     rabbitmq:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - deepfake-net
+
+volumes:
+  rabbitmq_data:
+    driver: local
+
+networks:
+  deepfake-net:
+    driver: bridge
