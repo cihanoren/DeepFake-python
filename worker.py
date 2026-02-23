@@ -50,7 +50,7 @@ RABBITMQ_HOST  = os.getenv("RABBITMQ_HOST",  "localhost")
 RABBITMQ_PORT  = int(os.getenv("RABBITMQ_PORT", "5672"))
 RABBITMQ_USER  = os.getenv("RABBITMQ_USER",  "admin")
 RABBITMQ_PASS  = os.getenv("RABBITMQ_PASS",  "admin123")
-
+RABBITMQ_URL = os.getenv("RABBITMQ_URL")
 ANALYSIS_QUEUE = "analysis_queue"
 RESULT_QUEUE   = "result_queue"
 
@@ -211,22 +211,28 @@ def process_message(ch, method, properties, body):
 # ══════════════════════════════════════════════════════════════════
 # BAĞLANTI — Exponential Backoff
 # ══════════════════════════════════════════════════════════════════
-
 def create_connection() -> pika.BlockingConnection:
-    credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
-    params = pika.ConnectionParameters(
-        host=RABBITMQ_HOST,
-        port=RABBITMQ_PORT,
-        credentials=credentials,
-        heartbeat=60,
-        blocked_connection_timeout=300,
-    )
+    
+
+    if RABBITMQ_URL:
+        log.info("Railway AMQP URL kullanılıyor.")
+        params = pika.URLParameters(RABBITMQ_URL)
+    else:
+        log.info("Host/Port ile RabbitMQ bağlantısı kuruluyor.")
+        credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASS)
+        params = pika.ConnectionParameters(
+            host=RABBITMQ_HOST,
+            port=RABBITMQ_PORT,
+            credentials=credentials,
+            heartbeat=60,
+            blocked_connection_timeout=300,
+        )
 
     delay = 3
     for attempt in range(1, 11):
         try:
             conn = pika.BlockingConnection(params)
-            log.info(f"✔ RabbitMQ: {RABBITMQ_HOST}:{RABBITMQ_PORT}")
+            log.info("✔ RabbitMQ bağlantısı başarılı")
             return conn
         except AMQPConnectionError:
             log.warning(f"Bağlantı denemesi {attempt}/10 başarısız. {delay}s bekleniyor...")
@@ -234,7 +240,6 @@ def create_connection() -> pika.BlockingConnection:
             delay = min(delay * 2, 30)
 
     raise RuntimeError("RabbitMQ'ya bağlanılamadı. 10 deneme tükendi.")
-
 
 # ══════════════════════════════════════════════════════════════════
 # ANA DÖNGÜ
