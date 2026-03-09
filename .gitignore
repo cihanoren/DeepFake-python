@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Ortam
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+*.log
