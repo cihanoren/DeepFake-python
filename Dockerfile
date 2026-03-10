@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
     libglib2.0-0 \
-    libgl1-mesa-glx \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Önce requirements — Docker cache katmanı (kod değişse bile pip çalışmaz)
@@ -28,14 +28,14 @@ RUN pip install --upgrade pip \
 # ── Stage 2: Runtime ──────────────────────────────────────────────
 FROM python:3.11-slim AS runtime
 
-LABEL maintainer="alikoroglu <https://github.com/alikorogluts>"
+LABEL maintainer="cihanoren <https://github.com/cihanoren>"
 LABEL description="DeepFake Detection – RabbitMQ Async Worker"
 LABEL version="3.0.0"
 
 # Çalışma zamanı sistem bağımlılıkları
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
-    libgl1-mesa-glx \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Builder'dan kurulu paketleri kopyala
